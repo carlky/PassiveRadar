@@ -1,4 +1,4 @@
-﻿# Installera git:
+# Installera git:
 
 I kommandoprompten, skriv 'git version'. Om du har git installerat får du ett svar i stil med:
 'git version 2.15.1'
@@ -68,5 +68,3 @@ Brancha:
 	index.html | 1 + 
 	
 	1 file changed, 1 insertion(+)
-
-	Test Erik
