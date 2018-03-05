@@ -3,7 +3,7 @@
 % Return value syncronised x1 with respect to x2
 
 % The signals cant lag more than 10 samples
-function [s1,t_lag] = Time_Sync_m(SDR_ref,SDR_sig_to_sync)
+function [s1,t_lag] = Time_Sync(SDR_ref,SDR_sig_to_sync)
 MAX_LAG= 10;
 % If t_lag is postitive SDR_sig_to_sync lags behind SDR_ref
 % If t_lag is negative SDR_ref lags behind SDR_sig_to_sync
