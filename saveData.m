@@ -17,13 +17,14 @@ function saveData(CenterFrequency,SampleFrequency,Data,varargin)
     addRequired(p,'CenterFrequency',@isnumeric);
     addRequired(p,'SampleFrequency',@isnumeric);
     addRequired(p,'Data',@isnumeric);
-    addParamater(p,'Filename',defaultFilename,@ischar);
+    addParameter(p,'Filename',defaultFilename,@ischar);
     
     parse(p,CenterFrequency,SampleFrequency,Data,varargin{:});
     
     path = [pwd filesep 'Data' filesep p.Results.Filename '.mat'];
     
-    save(path,'--struct',...
-        struct('CenterFrequency',p.Results.CenterFrequency,...
+    s = struct('CenterFrequency',p.Results.CenterFrequency,...
         'SampleFrequency',p.Results.SampleFrequency,...
-        'Data',p.Results.Data));
+        'Data',p.Results.Data);
+    
+    save(path,'-struct','s');
