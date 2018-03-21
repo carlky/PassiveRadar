@@ -5,7 +5,7 @@ function s = loadData(filename)
     %The returned data is in the form of a struct with
     %fields CenterFrequency, SampleFrequency and Data.
     
-    path = [pwd filesep '/Data/' filesep filename '.mat'];
+    path = [pwd filesep 'Data' filesep filename '.mat'];
     
     s = load(path);
     
