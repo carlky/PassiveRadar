@@ -33,14 +33,19 @@ else
                 convertStringsToChars(extractBefore(s(i),':')))];
         end
     end
+    %disp(dev_num)
     
     dev_ser = dev_num; % array for device serial number (values changed later)
     % Loop through all devices and find their serial number.
     for i = 1:length(dev_num)
-        [~,cmdout] = system(['rtl_eeprom -d ' i]);
-        dev_ser(i) = str2double(convertStringsToChars(...
-            extractBetween(cmdout,'Serial number:',newline)));
+        [~,cmdout] = system(['rtl_eeprom -d ' num2str(dev_num(i))]);
+        %disp(['rtl_eeprom -d ' num2str(dev_num(i))])
+        %disp(cmdout)
+        %disp(convertStringsToChars(extractBetween(cmdout,'Serial number:',newline)))
+        dev_ser(i) = str2double(convertStringsToChars(extractBetween(cmdout,'Serial number:',newline)));
     end
+    
+    %disp(dev_ser)
     
     % Send cmd to all detected SDRs to start recording. 
     cmdin = ['rtl_sdr -f %d -s %d -n %d -g 8.7 -d %d '...
