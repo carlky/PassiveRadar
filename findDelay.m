@@ -7,11 +7,13 @@
 % OUTPUT:       delT [time] 
 %
 % WRITTEN BY:   Johan Karlsson 
-% STATUS:       Finished, Tested, 
+% STATUS:       Finished, Tested, works good with low noise.
 % ************************************************************
 
 function [delT] = findDelay(signal_1, signal_2)
 
+% If this doesn't work utilise the xcov command to remove some of the
+% gaussian noise. 
 [acor,lag] = xcorr(signal_1.data, signal_2.data);   
 [~,I] = max(abs(acor));
 lagDiff = lag(I);                
