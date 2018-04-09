@@ -8,7 +8,11 @@ function sig = syncSignals(oldSig,syncFrequency)
 % - data: An m by n matrix, where m is the number of receivers and n is the
 %         length of the recorded data
 % The difference is that the data has zeros added in the begining and/or 
-% end to make sure the signals have the sime time reference. 
+% end to make sure the signals have the sime time reference. The function
+% does not compensate for geometry and assumes that the syncsignal arrives
+% at all receivers approxiamtelly simultaneously. 
+
+% TODO: COMPENSATE FOR FREQUENCY SHIFT OF LOCAL OSCILLATORS
 
 [m,n] = size( oldSig.data); % Size of data for later use
 
@@ -22,7 +26,7 @@ if syncIndex < 1 || syncIndex >
 end
 
 % Calculate the fourier transform and shift it to differentiate between
-% positive and negative frequencies.
+% positive and negative frequencies (negative relative centerFrequency).
 shiftedFft = fftshift( fft(oldSig.data, 2^nextpow2(n), 2), 2);
 absShiftedFft = abs(shiftedFft);
 
@@ -65,8 +69,6 @@ for i = 2:m
     [~,j] = max(abs(xcor));
     lagDiff(i) = lags(j);
 end
-
-% TODO Compensate for geometry
 
 % Change lagDiff so that the minimum lagDiff is 0 and create place in
 % memory for the new data which will be max(lagDiff) longer than the
