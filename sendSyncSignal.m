@@ -18,7 +18,7 @@ function sendSyncSignal(centerFrequency,duration)
 % modified.
 connectedRadios = findsdru;
 if strncmp(connectedRadios(1).Status, 'Success', 7)
-  if strncmp(connectedRadios(1).Platform,'N200/N210/USRP2')
+  if strcmp(connectedRadios(1).Platform,'N200/N210/USRP2')
       address = connectedRadios(1).IPAddress;
       platform = 'N200/N210/USRP2';
   else
