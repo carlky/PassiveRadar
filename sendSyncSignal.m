@@ -43,7 +43,7 @@ radioInfo = info(radio);
 
 % Calculate how many times the signal should be repeated, rounding the
 % number up significantly. 
-playCount = ceil(72.4695/duration + 0.5);
+playCount = ceil(duration/72.4695 + 0.5);
 
 % Create an audio source and reference the audiofile that you want to read.
 % MATLAB comes preloaded with a few audiofiles, more can be had with the
@@ -57,15 +57,29 @@ audio = dsp.AudioFileReader('RockGuitar-16-44p1-stereo-72secs.wav',...
 % Create a comm.FMBroadcastModulator object to encode the audio signal into 
 % an FM signal at samplerate radioInfo.BasebandSampleRate. 
 fmbMod = comm.FMBroadcastModulator('AudioSampleRate',audio.SampleRate, ...
-    'SampleRate',radioInfo.BasebandSampleRate);
+    'SampleRate',radioInfo.BasebandSampleRate,...
+    'Stereo',true);
 
 % Get at piece of audio data, modulate it into an FM-signal and send it out
 % to the USRP device. 
+
+disp(['Starting transmission! Planning on transmitting for ' ...
+    num2str(playCount*72.4695) ' seconds' ]);
+tic
+progress = 0.1;
+progressStep = 0.1;
 while ~isDone(audio)
     audioData = audio();
     modData = fmbMod(audioData);
     radio(modData);
+    if toc/playCount/72.4695 > progress
+        disp([num2str(progress*100) '% done. Took ' num2str(toc) ...
+            ' seconds.']);
+        progress = progress + progressStep;
+    end
 end
+disp(['Transmission finished! Transmitted for ' num2str(toc)... 
+    ' seconds']);
 
 % Release the radio and fm modulator. 
 release(radio);
