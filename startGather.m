@@ -5,6 +5,11 @@ function numSDR = startGather(centerFrequency, sampleRate, duration)
 % All SDRs need to have unique serial number, to set this use:
 % 'rtl_eeprom -d 0 -s 01' for setting device 0 with serial number 01.  
 
+% Determine if ismac and set path for cmds to work.
+if ismac
+    setenv('PATH', [getenv('PATH') ':/usr/local/bin/']);
+end
+
 l = 0; % Reference for newData for how much data has been read
 save('readLines.mat','l');
 
