@@ -1,8 +1,8 @@
-function sig = syncSignals(oldSig,syncFrequency)
+function sig = syncSignals(oldSig,syncFrequency,syncBandwidth,plotSteps)
 
 % Function to sync oldSig signal according to signal broadcast at
-% syncFrequency. Returns an identical signal object, sig with the same
-% fields as sigOld, that is:
+% syncFrequency with bandwidth syncBandwidth. Returns an identical signal 
+% object, sig with the same fields as sigOld, that is:
 % - centerFrequency: The frequency that the the receviers are listening to
 % - sampleRate: The rate at which new samples are recorded
 % - data: An m by n matrix, where m is the number of receivers and n is the
@@ -10,70 +10,58 @@ function sig = syncSignals(oldSig,syncFrequency)
 % The difference is that the data has zeros added in the begining and/or 
 % end to make sure the signals have the sime time reference. The function
 % does not compensate for geometry and assumes that the syncsignal arrives
-% at all receivers approxiamtelly simultaneously. 
+% at all receivers approxiamtelly simultaneously. Optional argument
+% plotSteps can be set to true to plot all analysis steps. However, this is
+% considerably slower. 
 
 % TODO: COMPENSATE FOR FREQUENCY SHIFT OF LOCAL OSCILLATORS
 
 [m,n] = size( oldSig.data); % Size of data for later use
+
+% Default for plotSteps is false, unless an argument is provided
+if ~exist('plotSteps','var')
+    plotSteps = false;
+end
+
 
 % Convert syncFrequency to index of fouriertransform and make sure that
 % index is valid and not outside the length (and therefore bandwidth) of
 % the recorded frequencies. If not, thow error!
 syncIndex = round(n*(syncFrequency-oldSig.centerFrequency + ...
     oldSig.sampleRate/2)/oldSig.sampleRate);
-if syncIndex < 1 || syncIndex > n
+syncBandwidthIndex = round(n*syncBandwidth/2/oldSig.sampleRate);
+width = syncIndex + [-1,1]*syncBandwidthIndex;
+if width(1) < 1 || width(2) > n
     error('Sync frequency  outside bandwidth!! Aborting!');
 end
 
-% Calculate the fourier transform and shift it to differentiate between
-% positive and negative frequencies (negative relative centerFrequency).
-shiftedFft = fftshift( fft(oldSig.data, [], 2), 2);
-absShiftedFft = abs(shiftedFft);
-
-% Calculate a noisefloor to compare the fourier transform with. The
-% noisefloor is taken as the average absolute movement between two
-% frequencies. Select the frequencies above the noise floor. 
-noiseFloor = mean( abs( (absShiftedFft( :, 2:n) - absShiftedFft( :, 1:n-1))),2);
-selected = absShiftedFft > noiseFloor;
-
-clear absShiftedFft noiseFloor; % Clear to keep memory clean
-
-% Check to make sure the sync signal is visible above the noise floor. If
-% not, thow error!
-if ~prod(selected(:,syncIndex)) 
-    error('Sync signal not above noise floor!! Aborting!');
-end
-
-% Find the bandwidth of the signal and produce a multi dimensional
-% heaviside to single out only the desired signal.
-width = zeros(m,2);
-for i = 1:m
-    width(i,1) = find( prod( selected( m, 1:syncIndex)) == 0, 1, 'last');
-    width(i,2) = find( prod( selected( m, syncIndex:n)) == 0, 1);
-end
-clear selected syncIndex; % Clear to keep memory clean
-multiDimHeaviside = heaviside( ones( m, 1)*(1:n) - width( :, 1))...
-                    .*heaviside( -ones( m, 1)*(1:n) + width( :, 2));
-
-% Inverse fourier transform to get the signal in time domain
-syncSigData = ifft( ifftshift( shiftedFft.*multiDimHeaviside, 2), ...
-    [], 2);
-
-clear shiftedFft multiDimHeaviside width; % Clear to keep memory clean
+syncSigData = ifft(ifftshift(fftshift(fft(oldSig.data,[],2),2)...
+    .*heaviside((1:n)-width(1)).*heaviside(width(2)-(1:n)),2),[],2);
 
 % Calculate the lag difference for the different signals relative to signal
-% 1. 
-
-disp(size(syncSigData))
+% 1. Plot the frequencies for the syncSigData and the xcor between the
+% different signals if plotSteps is enabled. 
 lagDiff = zeros(m,1);
-figure;
+
+if plotSteps
+    clf;
+    plot(real(fftshift(fft(syncSigData(1,:)))));
+    pause
+end
 for i = 2:m
     [xcor,lags] = xcorr( syncSigData(1,:), syncSigData(i,:));
-    disp(size(xcor))
-    plot(xcor)
-    pause
-    [~,j] = max(abs(xcor));
+    [~,j] = max(real(xcor));
     lagDiff(i) = lags(j);
+    if plotSteps
+        clf;
+        subplot(2,1,1)
+        plot(real(fftshift(fft(syncSigData(1,:)))))
+        subplot(2,1,2)
+        plot(real(xcor),'b.')
+        hold on;
+        plot(j,real(xcor(j)),'ro')
+        pause
+    end
 end
 
 % Change lagDiff so that the minimum lagDiff is 0 and create place in

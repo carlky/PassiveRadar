@@ -1,3 +1,4 @@
+
 function sig = newDataOffline(centerFrequency, sampleRate, dirName, sampleLength)
 
 % Reads data of length sampleLength. Returns this data in the form
