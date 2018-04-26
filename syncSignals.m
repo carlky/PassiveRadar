@@ -21,19 +21,19 @@ function sig = syncSignals(oldSig,syncFrequency)
 % the recorded frequencies. If not, thow error!
 syncIndex = round(n*(syncFrequency-oldSig.centerFrequency + ...
     oldSig.sampleRate/2)/oldSig.sampleRate);
-if syncIndex < 1 || syncIndex > 
+if syncIndex < 1 || syncIndex > n
     error('Sync frequency  outside bandwidth!! Aborting!');
 end
 
 % Calculate the fourier transform and shift it to differentiate between
 % positive and negative frequencies (negative relative centerFrequency).
-shiftedFft = fftshift( fft(oldSig.data, 2^nextpow2(n), 2), 2);
+shiftedFft = fftshift( fft(oldSig.data, [], 2), 2);
 absShiftedFft = abs(shiftedFft);
 
 % Calculate a noisefloor to compare the fourier transform with. The
 % noisefloor is taken as the average absolute movement between two
 % frequencies. Select the frequencies above the noise floor. 
-noiseFloor = mean( abs( (absShiftedFft( :, 2:n) - absShiftedFft( :, 1:n-1))));
+noiseFloor = mean( abs( (absShiftedFft( :, 2:n) - absShiftedFft( :, 1:n-1))),2);
 selected = absShiftedFft > noiseFloor;
 
 clear absShiftedFft noiseFloor; % Clear to keep memory clean
@@ -57,15 +57,21 @@ multiDimHeaviside = heaviside( ones( m, 1)*(1:n) - width( :, 1))...
 
 % Inverse fourier transform to get the signal in time domain
 syncSigData = ifft( ifftshift( shiftedFft.*multiDimHeaviside, 2), ...
-    2^nextpow2(n), 2);
+    [], 2);
 
 clear shiftedFft multiDimHeaviside width; % Clear to keep memory clean
 
 % Calculate the lag difference for the different signals relative to signal
 % 1. 
+
+disp(size(syncSigData))
 lagDiff = zeros(m,1);
+figure;
 for i = 2:m
     [xcor,lags] = xcorr( syncSigData(1,:), syncSigData(i,:));
+    disp(size(xcor))
+    plot(xcor)
+    pause
     [~,j] = max(abs(xcor));
     lagDiff(i) = lags(j);
 end
