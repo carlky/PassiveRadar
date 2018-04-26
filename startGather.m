@@ -35,7 +35,7 @@ else
     for i = 1:length(s)
         if length(matches{i}) == 1
             dev_num = [dev_num, str2double(...
-                convertStringsToChars(extractBefore(s(i),':')))];
+                char(extractBefore(s(i),':')))];
         end
     end
     %disp(dev_num)
@@ -47,7 +47,7 @@ else
         %disp(['rtl_eeprom -d ' num2str(dev_num(i))])
         %disp(cmdout)
         %disp(convertStringsToChars(extractBetween(cmdout,'Serial number:',newline)))
-        dev_ser(i) = str2double(convertStringsToChars(extractBetween(cmdout,'Serial number:',newline)));
+        dev_ser(i) = str2double(char(extractBetween(cmdout,'Serial number:',newline)));
     end
     
     %disp(dev_ser)
