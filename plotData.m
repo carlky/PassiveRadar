@@ -7,11 +7,8 @@
 %
 % OUTPUT:       Pretty figures
 % WRITTEN BY:   Johan Karlsson and Oskar Lindblad 
-% STATUS:       Not finished
+% STATUS:       Finished
 % ************************************************************
-
-
-
 function plotData(direction, t_delay, fig)
 
         L = 1000*haversine('57 41 38N, 012 03 32E', '57 41 28N, 011 058 30E'); %Antalet meter mellan oss och Brudaremossen
