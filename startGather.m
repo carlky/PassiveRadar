@@ -55,8 +55,10 @@ else
     % Send cmd to all detected SDRs to start recording. 
     cmdin = ['rtl_sdr -f %d -s %d -n %d -g 8.7 -d %d '...
         pwd filesep 'capt%d.cfile &']; % Format for command
+    load frequencyShift frequencyShift % Load the  saved frequencyShifts 
+                                       % for each SDR from calibration
     for i=1:length(dev_num)
-        system(sprintf(cmdin,centerFrequency,sampleRate,...
+        system(sprintf(cmdin,centerFrequency-frequencyShift(i),sampleRate,...
             duration*sampleRate,dev_num(i),dev_ser(i)));
     end
     

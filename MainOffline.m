@@ -1,13 +1,13 @@
 %% MainOffline
 clear all
 % dirname=organizeFiles();
-dirName='Reading 23-Apr-2018 10-23-42';
+dirName='Reading 27-Apr-2018 09-32-41';
 centerFrequency=626e6;
 sampleRate=2e6;
 syncFrequency = 625.5e6;
 syncBandwidth = 0.4e6;
 
-sampleLength=8e6;       
+sampleLength=2e6;       
 %If sample frequency is 2MHz, there will be 4 Mrows/s in the data files,
 %captX.cfile. The function newDataOffline will give one second of data if
 %sampleLength=2e6.
@@ -24,6 +24,7 @@ tic
 %while l<=fileLength-sampleLength*2
     sig = newDataOffline(centerFrequency, sampleRate, dirName, sampleLength);
 toc 
+sig.data = sig.data - mean(sig.data,2);
 %%
 tic;
     sig_new = syncSignals(sig, syncFrequency,syncBandwidth,true);

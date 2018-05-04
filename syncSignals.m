@@ -35,31 +35,56 @@ if width(1) < 1 || width(2) > n
     error('Sync frequency  outside bandwidth!! Aborting!');
 end
 
-syncSigData = ifft(ifftshift(fftshift(fft(oldSig.data,[],2),2)...
-    .*heaviside((1:n)-width(1)).*heaviside(width(2)-(1:n)),2),[],2);
+
+% Time vector:
+t=(0:(n-1))/oldSig.sampleRate;
+% Local oscillator for frequency shift:
+lo=exp(1i*2*pi*-(syncFrequency-oldSig.centerFrequency).*t);
+% Downconverted signal: 
+down_sig=oldSig.data.*lo;
+% Filter:
+LPF=fir1(256,syncBandwidth/2/(oldSig.sampleRate/2),'low');
+
+down_sig_filt = zeros(m,n);
+for i = 1:m
+    down_sig_filt(i,:) = filtfilt(LPF,1,down_sig(i,:));
+    % If plotSteps, the first results are plotted for verification that 
+    % everything is working as intended. The rest of the filtering is
+    % continued and the program is paused at the end waiting for keypress
+    % to proceed.
+    if plotSteps && i == 1
+        clf;
+        subplot(3,1,1)
+        freq = linspace(-oldSig.sampleRate/2,oldSig.sampleRate/2,...
+            length(oldSig.data));
+        plot(freq,abs(fftshift(fft(oldSig.data(1,:)))))
+        title('Original spectrum')
+        subplot(3,1,2)
+        plot(freq,abs(fftshift(fft(down_sig(1,:)))))
+        title('Frequency shifted spectrum')
+        subplot(3,1,3)
+        plot(freq,abs(fftshift(fft(down_sig_filt(1,:)))))
+        title('Filtered frequency shifted spectrum')
+        pause(0.1) % Allow plot to show up
+    elseif plotSteps && i == m
+        pause
+    end
+end
 
 % Calculate the lag difference for the different signals relative to signal
 % 1. Plot the frequencies for the syncSigData and the xcor between the
 % different signals if plotSteps is enabled. 
 lagDiff = zeros(m,1);
 
-if plotSteps
-    clf;
-    plot(real(fftshift(fft(syncSigData(1,:)))));
-    pause
-end
 for i = 2:m
-    [xcor,lags] = xcorr( syncSigData(1,:), syncSigData(i,:));
-    [~,j] = max(real(xcor));
+    [r,lags] = xcorr( down_sig_filt(1,:), down_sig_filt(i,:));
+    [~,j] = max(r);
     lagDiff(i) = lags(j);
     if plotSteps
         clf;
-        subplot(2,1,1)
-        plot(real(fftshift(fft(syncSigData(1,:)))))
-        subplot(2,1,2)
-        plot(real(xcor),'b.')
+        plot(abs(r),'b.')
         hold on;
-        plot(j,real(xcor(j)),'ro')
+        plot(j,abs(r(j)),'ro')
         pause
     end
 end
@@ -78,3 +103,5 @@ end
 sig = struct('centerFrequency',oldSig.centerFrequency,...
     'sampleRate',oldSig.sampleRate,...
     'data',data);
+
+% Filter out syncsignal:
