@@ -14,36 +14,43 @@ function sig = syncSignals(oldSig,syncFrequency,syncBandwidth,plotSteps)
 % plotSteps can be set to true to plot all analysis steps. However, this is
 % considerably slower. 
 
-% TODO: COMPENSATE FOR FREQUENCY SHIFT OF LOCAL OSCILLATORS
+sig = oldSig;
+clear oldSig
+sampleRate = sig.sampleRate;
+centerFrequency = sig.centerFrequency;
 
-[m,n] = size( oldSig.data); % Size of data for later use
+[m,n] = size( sig.data); % Size of data for later use
 
 % Default for plotSteps is false, unless an argument is provided
 if ~exist('plotSteps','var')
     plotSteps = false;
 end
 
-
-% Convert syncFrequency to index of fouriertransform and make sure that
-% index is valid and not outside the length (and therefore bandwidth) of
-% the recorded frequencies. If not, thow error!
-syncIndex = round(n*(syncFrequency-oldSig.centerFrequency + ...
-    oldSig.sampleRate/2)/oldSig.sampleRate);
-syncBandwidthIndex = round(n*syncBandwidth/2/oldSig.sampleRate);
-width = syncIndex + [-1,1]*syncBandwidthIndex;
-if width(1) < 1 || width(2) > n
+% Make sure that syncFrequency + bandwidth is inside bandwidth, if not
+% throw error
+if syncFrequency-syncBandwidth/2-centerFrequency < -sampleRate || ...
+        syncFrequency+syncBandwidth/2-centerFrequency > sampleRate
     error('Sync frequency  outside bandwidth!! Aborting!');
 end
 
+% Frequency compensate for the offset of local oscillators:
+df = sampleRate/n; % Resolution in frequency
+fftData = fftshift(fft(sig.data,[],2),2);
+indexes = round((syncFrequency-centerFrequency + ...
+    sampleRate/2)/df + linspace(-1e5,1e5,2e5+1));
+[~,ind] = max(fftData(:,indexes),[],2);
+% Frequency relative to sync
+freq = (ind-length(indexes)/2)*df;
+t=(0:(n-1))/sampleRate; % Time vector
+sig.data = sig.data.*lo(freq,t); % Frequency shift!
+fprintf(['Done with intitial frequency shifting! \n'...
+    'Starting filtering of syncsignal! \n \n'])
 
-% Time vector:
-t=(0:(n-1))/oldSig.sampleRate;
-% Local oscillator for frequency shift:
-lo=exp(1i*2*pi*-(syncFrequency-oldSig.centerFrequency).*t);
+% Filter out only the syncsignal
 % Downconverted signal: 
-down_sig=oldSig.data.*lo;
+down_sig=sig.data.*lo(syncFrequency-centerFrequency,t);
 % Filter:
-LPF=fir1(256,syncBandwidth/2/(oldSig.sampleRate/2),'low');
+LPF=fir1(256,syncBandwidth/2/(sampleRate/2),'low');
 
 down_sig_filt = zeros(m,n);
 for i = 1:m
@@ -52,56 +59,149 @@ for i = 1:m
     % everything is working as intended. The rest of the filtering is
     % continued and the program is paused at the end waiting for keypress
     % to proceed.
-    if plotSteps && i == 1
-        clf;
-        subplot(3,1,1)
-        freq = linspace(-oldSig.sampleRate/2,oldSig.sampleRate/2,...
-            length(oldSig.data));
-        plot(freq,abs(fftshift(fft(oldSig.data(1,:)))))
-        title('Original spectrum')
-        subplot(3,1,2)
-        plot(freq,abs(fftshift(fft(down_sig(1,:)))))
-        title('Frequency shifted spectrum')
-        subplot(3,1,3)
-        plot(freq,abs(fftshift(fft(down_sig_filt(1,:)))))
-        title('Filtered frequency shifted spectrum')
-        pause(0.1) % Allow plot to show up
-    elseif plotSteps && i == m
-        pause
-    end
-end
-
-% Calculate the lag difference for the different signals relative to signal
-% 1. Plot the frequencies for the syncSigData and the xcor between the
-% different signals if plotSteps is enabled. 
-lagDiff = zeros(m,1);
-
-for i = 2:m
-    [r,lags] = xcorr( down_sig_filt(1,:), down_sig_filt(i,:));
-    [~,j] = max(r);
-    lagDiff(i) = lags(j);
     if plotSteps
         clf;
-        plot(abs(r),'b.')
+        subplot(3,1,1)
+        freq = linspace(-sampleRate/2,sampleRate/2,...
+            length(sig.data));
+        plot(freq,abs(fftshift(fft(sig.data(i,:)))))
+        title('Original spectrum')
+        subplot(3,1,2)
+        plot(freq,abs(fftshift(fft(down_sig(i,:)))))
+        title('Frequency shifted spectrum')
+        subplot(3,1,3)
+        plot(freq,abs(fftshift(fft(down_sig_filt(i,:)))))
+        [~,ind]=max(abs(fftshift(fft(down_sig_filt(i,:)))));
         hold on;
-        plot(j,abs(r(j)),'ro')
-        pause
+        plot(freq(ind),abs(fftshift(fft(down_sig_filt(i,ind)))))
+        fprintf(['SDR ' num2str(i) ' syncsignal ' num2str(freq(ind)) ...
+            ' Hz from center \n \t after centering and filtering \n'])
+        hold off;
+        title('Filtered frequency shifted spectrum')
+        pause(1) % Wait for userinput before continuing
     end
 end
-
-% Change lagDiff so that the minimum lagDiff is 0 and create place in
-% memory for the new data which will be max(lagDiff) longer than the
-% original data. Put the old data into the new data with the lagg
-% differences compensated for. 
-lagDiff = lagDiff - min(lagDiff);
-data = zeros(m,n+max(lagDiff));
-for i = 1:m
-    data(m, (1:n) + lagDiff(i)) = oldSig.data(m,:);
+if plotSteps
+    fprintf('\n')
 end
+fprintf(['Done with filtering of syncsignal! \n' ...
+    'Starting time alignment! \n\n'])
 
-% Create final sig object to return
-sig = struct('centerFrequency',oldSig.centerFrequency,...
-    'sampleRate',oldSig.sampleRate,...
-    'data',data);
+% Calculate the adjustment needed for the signals to be time aligned and 
+% align them
 
-% Filter out syncsignal:
+% Actual syncing:
+
+% First: Find integer alignment and cut data that is not used:
+intDelay = zeros(m,1);
+for i = 2:m
+    r=xcorr(down_sig_filt(1,:),down_sig_filt(i,:));
+    [~,maxind]=max(r);
+    intDelay(i)=maxind-(n+1); % Delay relative to middle
+    % If plotSteps, plot the cross correlation pre alignment
+    if plotSteps
+        clf;
+        t = linspace(-length(r)/sampleRate/2,...
+            length(r)/sampleRate/2,length(r));
+        plot(t,abs(r),'b.')
+        hold on;
+        plot(t(maxind),abs(r(maxind)),'ro')
+        hold off;
+        title('Cross correlation before alignment')
+        pause(1)
+    end
+end
+%Cut away the part of the signal that do not correlate:
+cut_down_sig_filt = zeros(m,n + min(intDelay) - max(intDelay));
+cut_data = cut_down_sig_filt;
+for i = 1:m
+    cut_down_sig_filt(i,:) = ...
+        down_sig_filt(i,(max(intDelay)+1:n + min(intDelay)) - intDelay(i));
+    cut_data(i,:) = ...
+        sig.data(i,(1 + max(intDelay):n + min(intDelay)) - intDelay(i));
+end
+% Second: find accurate alignment to sub sample resolution:
+N = 1e2; % Limit on cross correlation width for subsample resolution for 
+    % increasing speed of calculation
+for i = 2:m
+    r=xcorr(cut_down_sig_filt(1,:),cut_down_sig_filt(i,:),N);
+    tdelta=fminbnd(@(tdelta) -abs(circdelay_local(r,tdelta,N+1)), ...
+        -0.5, 0.5,optimset('TolX',1e-12));
+    cut_data(i,:) = circdelay_local(cut_data(i,:),-tdelta);
+    fprintf(['Signal ' num2str(i) ' relative to 1 was started \n \t' ...
+            num2str((intDelay(i)+tdelta)/sampleRate) ...
+            ' seconds late. \n'])
+    % If plotSteps, plot the crosscorrelation after alignment:
+    if plotSteps
+        clf;
+        % Do the subsample aligment to down_sig_filt
+        cut_down_sig_filt(i,:) = ...
+            circdelay_local(cut_down_sig_filt(i,:),-tdelta);
+        r = xcorr(cut_down_sig_filt(1,:),cut_down_sig_filt(i,:));
+        [~,maxind]=max(r);
+        t = linspace(-length(r)/sampleRate/2,...
+            length(r)/sampleRate/2,length(r));
+        plot(t,abs(r),'b.')
+        hold on;
+        plot(t(maxind),abs(r(maxind)),'ro')
+        hold off;
+        title('Cross correlation after alignment')
+        pause(1)
+    end
+end
+sig.data = cut_data;
+[m,n] = size( sig.data); % Updated size of data
+fprintf(['\n Done with time alignment! \n'...
+    'Starting filtering of final signal! \n\n'])
+
+
+% Filter out the syncsignal and leave only the rest of the signal
+% Time vector:
+t=(0:(n-1))/sampleRate;
+% Frequency shift the aligned signal:
+down_sig = sig.data.*lo(syncFrequency-centerFrequency,t);
+down_sig_filt = down_sig;
+% Filter:
+HPF=fir1(256,syncBandwidth/2/(sampleRate/2),'high');
+for i = 1:m
+    down_sig_filt(i,:) = filtfilt(HPF,1,down_sig(i,:));
+    % If plotSteps, results are plotted to make sure everything is working
+    % fine:
+    if plotSteps
+        sig_filt = down_sig_filt(i,:)./lo(syncFrequency-centerFrequency,t);
+        clf;
+        subplot(3,1,1)
+        freq = linspace(-sampleRate/2,sampleRate/2,...
+            length(sig.data));
+        plot(freq,abs(fftshift(fft(down_sig(i,:)))))
+        title('Frequency shifted spectrum')
+        subplot(3,1,2)
+        plot(freq,abs(fftshift(fft(down_sig_filt(i,:)))))
+        title('Filtered frequency shifted spectrum')
+        subplot(3,1,3)
+        plot(freq,abs(fftshift(fft(sig_filt))))
+        title('Filtered inverse frequency shifted spectrum')
+        pause(1);
+    end 
+end
+clf;
+fprintf('Done with filtering, function syncSignals is finished! \n\n')
+
+
+sig.data = down_sig_filt./lo(syncFrequency-centerFrequency,t);
+
+function lo = lo(f,t)
+    % Create a local oscillator for frequency shifting with frequency shift
+    % f and time vector t. 
+    lo = exp(1i*2*pi*-f.*t);
+    
+function x2=circdelay_local(x,delay,N) 
+% time shifting by a linear phase addition in the spectral domain.
+% Parameter N is only used in the optimization, otherwise unnessesary
+%
+% Courtesy of Professor Thomas Eriksson, Chalmers University of Technology
+
+x2=ifft(ifftshift(fftshift(fft(x)).*exp(1i*2*pi*delay*(-length(x)/2:length(x)/2-1)/length(x))));
+if nargin>2
+    x2=x2(N); % this is just for the optimization fminbnd
+end

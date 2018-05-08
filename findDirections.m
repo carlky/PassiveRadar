@@ -1,4 +1,4 @@
-function [pks,directions] = findDirections(sig)
+function [pks,directions] = findDirections(sig,plotSteps)
 %findDirections: Scanning the incoming signals in directions theta=0->2pi
 %in order to find angles (directions) to potential targets, these includes
 %angles to stationary targets. The problem is set up so that by maximizing
@@ -50,10 +50,18 @@ end
 %Plotting the function to maxzimize, M, versus the corresponding angles.
 %This part should be removed in the final design, but it's instructive for
 %illustrative purposes when testing the findDirections function.
-%findpeaks(M,theta,'threshold',0);
-%title('maximize M')
-%xlabel('\theta (radians)')
-%ylabel('M(\theta) in V^2')
+
+% Default for plotSteps is false, unless an argument is provided
+if ~exist('plotSteps','var')
+    plotSteps = false;
+end
+
+if plotSteps
+    findpeaks(M,theta,'threshold',0);
+    title('maximize M')
+    xlabel('\theta (radians)')
+    ylabel('M(\theta) in V^2')
+end
 
 %Find peak values of M (pks), these corresponds to potential angles to
 %targets (these includes static targets as well), the value in the findpeaks function 
