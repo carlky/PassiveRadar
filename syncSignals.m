@@ -103,12 +103,15 @@ for i = 2:m
         clf;
         t = linspace(-length(r)/sampleRate/2,...
             length(r)/sampleRate/2,length(r));
-        plot(t,abs(r),'b.')
+        plot(t,abs(r)/abs(r(maxind)),'b.')
         hold on;
-        plot(t(maxind),abs(r(maxind)),'ro')
+        plot(t(maxind),1,'ro')
         hold off;
         title('Cross correlation before alignment')
         pause(1)
+        if i == 2
+            save('preAlignCross.mat','r','t')
+        end
     end
 end
 %Cut away the part of the signal that do not correlate:
@@ -141,12 +144,15 @@ for i = 2:m
         [~,maxind]=max(r);
         t = linspace(-length(r)/sampleRate/2,...
             length(r)/sampleRate/2,length(r));
-        plot(t,abs(r),'b.')
+        plot(t,abs(r)/abs(r(maxind)),'b.')
         hold on;
-        plot(t(maxind),abs(r(maxind)),'ro')
+        plot(t(maxind),1,'ro')
         hold off;
         title('Cross correlation after alignment')
         pause(1)
+        if i == 2
+            save('postAlignCross.mat','r','t')
+        end
     end
 end
 sig.data = cut_data;
